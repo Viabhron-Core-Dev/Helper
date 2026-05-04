@@ -32,4 +32,27 @@ class VianViewModel(private val repository: AppRepository) : ViewModel() {
             repository.trashNote(id)
         }
     }
+
+    fun seedInitialData() {
+        viewModelScope.launch {
+            // Check if we already have data
+            if (notes.value.isEmpty()) {
+                addNote("Welcome to VIAN", "This is your new native dashboard.", NoteType.TEXT)
+            }
+            if (expenses.value.isEmpty()) {
+                repository.insertExpense(Expense(
+                    item = "Initial Item",
+                    category = "System",
+                    subcategory = "Setup",
+                    price = 0.0,
+                    weightLabel = "N/A",
+                    weightKg = 0.0,
+                    shop = "System",
+                    date = "2026-05-04",
+                    createdAt = System.currentTimeMillis(),
+                    instanceId = null
+                ))
+            }
+        }
+    }
 }
