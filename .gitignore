@@ -1,0 +1,19 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Android/Gradle
+.gradle/
+local.properties
+capture/
+**/build/
+*.apk
+*.aar
+*.jks
+*.keystore
+!gradle-wrapper.jar

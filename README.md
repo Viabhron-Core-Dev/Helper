@@ -1,11 +1,35 @@
-<div align="center">
+# VIAN Native Android App
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+This project has been migrated from a PWA to a full native Android application using Kotlin and Jetpack Compose.
 
-  <h1>Built with AI Studio</h2>
+## Project Structure
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+- `app/`: The main Android application module.
+  - `src/main/java/com/vian/app/`: Kotlin source code.
+  - `src/main/res/`: Android resources (strings, themes).
+- `.github/workflows/`: GitHub Actions configuration for CI/CD.
+- `web_reference/`: Original PWA source code for reference.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## Building Locally
 
-</div>
+To build the APK locally, run:
+```bash
+./gradlew assembleDebug
+```
+The output APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
+
+## GitHub Actions (CI/CD)
+
+Every time you push to the `main` or `master` branch, GitHub Actions will automatically:
+1. Set up the Android environment.
+2. Build the debug APK.
+3. Upload the APK as a workflow artifact.
+
+You can download the built APK from the **Actions** tab in your GitHub repository.
+
+## Features Implemented (Native)
+
+- **Room Database**: Local persistence for Notes, Expenses, Habits, Journal, and Events.
+- **Jetpack Compose**: Modern declarative UI for the Dashboard.
+- **Navigation**: Structured navigation between screens.
+- **Repository Pattern**: Clean architecture for data management.
