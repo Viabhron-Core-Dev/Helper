@@ -16,4 +16,10 @@ capture/
 *.aar
 *.jks
 *.keystore
+
+# Explicitly track Gradle wrapper
+!gradlew
+!gradlew.bat
+!gradle/
 !gradle-wrapper.jar
+!gradle-wrapper.properties
