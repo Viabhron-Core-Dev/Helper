@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,10 +30,20 @@ jobs:
       run: ./gradlew assembleDebug --stacktrace
 
     - name: Verify APK
-      run: ls -R app/build/outputs/apk/debug/
+      run: |
+        ls -R app/build/outputs/apk/debug/
+        APK_COUNT=$(ls app/build/outputs/apk/debug/*.apk | wc -l)
+        if [ "$APK_COUNT" -eq "0" ]; then
+          echo "No APK found!"
+          exit 1
+        fi
+
+    - name: List APKs
+      run: find app/build/outputs/apk/debug/ -name "*.apk"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: vian-app-debug
         path: app/build/outputs/apk/debug/*.apk
+        if-no-files-found: error
