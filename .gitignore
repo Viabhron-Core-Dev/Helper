@@ -6,20 +6,3 @@ coverage/
 *.log
 .env*
 !.env.example
-
-# Android/Gradle
-.gradle/
-local.properties
-capture/
-**/build/
-*.apk
-*.aar
-*.jks
-*.keystore
-
-# Explicitly track Gradle wrapper
-!gradlew
-!gradlew.bat
-!gradle/
-!gradle-wrapper.jar
-!gradle-wrapper.properties

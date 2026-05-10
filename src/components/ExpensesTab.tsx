@@ -7,16 +7,15 @@ import { Expense, ExpenseInstance } from '../types';
 import { expenseInstanceGetAll, expensesForInstance, expenseInstanceSave, expenseSave, expenseDelete, expenseInstanceDelete } from '../lib/db';
 import { CATEGORIES, CATEGORY_ICONS, SHOPS, WEIGHT_PRESETS } from '../constants';
 
-interface ExpensesTabProps {
-  triggerAdd: number;
-  sortType: 'modified' | 'created' | 'alphabetical' | 'date';
-}
+import { useApp } from '../AppContext';
 
-const ExpensesTab: React.FC<ExpensesTabProps> = ({ triggerAdd, sortType }) => {
+interface ExpensesTabProps {}
+
+const ExpensesTab: React.FC<ExpensesTabProps> = () => {
+  const { triggerAdd, sortType } = useApp();
   const [instances, setInstances] = useState<ExpenseInstance[]>([]);
   const [expandedInstance, setExpandedInstance] = useState<number | null>(null);
   const [instanceItems, setInstanceItems] = useState<Record<number, Expense[]>>({});
-  const [activeInstanceMenu, setActiveInstanceMenu] = useState<number | null>(null);
   
   const [showAddOuting, setShowAddOuting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,8 +50,6 @@ const ExpensesTab: React.FC<ExpensesTabProps> = ({ triggerAdd, sortType }) => {
       setIsSelectMode(true);
     } else {
       if (isSelectMode) window.history.back();
-      setIsSelectMode(false);
-      setSelectedIds(new Set());
     }
   };
 
@@ -204,14 +201,6 @@ const ExpensesTab: React.FC<ExpensesTabProps> = ({ triggerAdd, sortType }) => {
                        <span className="font-black text-zinc-900">₹{instance.total.toFixed(0)}</span>
                        {!isSelectMode && (expandedInstance === instance.id ? <ChevronDown size={18} className="text-zinc-400" /> : <ChevronRight size={18} className="text-zinc-400" />)}
                     </div>
-                    {!isSelectMode && expandedInstance !== instance.id && (
-                      <button 
-                         onClick={(e) => { e.stopPropagation(); setActiveInstanceMenu(instance.id!); }}
-                         className="p-1 hover:bg-black/5 rounded-full transition-colors"
-                      >
-                         <MoreVertical size={14} className="text-zinc-300" />
-                      </button>
-                    )}
                   </div>
                 </div>
 
@@ -226,20 +215,27 @@ const ExpensesTab: React.FC<ExpensesTabProps> = ({ triggerAdd, sortType }) => {
                                   <span className="text-sm font-bold text-zinc-700">{item.item}</span>
                                   <span className="text-[9px] font-black text-zinc-300 uppercase tracking-tighter">
                                     {item.subcategory} {item.weight_label !== 'Other' ? `• ${item.weight_label}` : ''}
+                                    {item.quantity && item.quantity > 1 ? ` • ${item.quantity} units` : ''}
                                     {item.comments && ` • ${item.comments}`}
                                   </span>
                                 </div>
                              </div>
                              <div className="flex items-center gap-3">
                                 <span className="text-sm font-black text-zinc-800">₹{item.price}</span>
-                                <button onClick={async (e) => { 
-                                  e.stopPropagation(); 
-                                  if (item.id) {
-                                    await expenseDelete(item.id);
-                                    await fetchAll();
-                                    await loadItems(instance.id!, true);
-                                  }
-                                }} className="text-zinc-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><X size={14}/></button>
+                                <button 
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    if (item.id) {
+                                      expenseDelete(item.id).then(() => {
+                                        fetchAll();
+                                        loadItems(instance.id!, true);
+                                      });
+                                    }
+                                  }} 
+                                  className="text-zinc-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <X size={14}/>
+                                </button>
                              </div>
                           </div>
                         ))}
@@ -247,7 +243,9 @@ const ExpensesTab: React.FC<ExpensesTabProps> = ({ triggerAdd, sortType }) => {
                      </div>
                      <div className="mt-4 pt-4 border-t border-dotted border-zinc-200 flex justify-between">
                         <button 
-                          onClick={() => instance.id && expenseInstanceDelete(instance.id).then(fetchAll)}
+                          onClick={() => {
+                            instance.id && expenseInstanceDelete(instance.id).then(fetchAll);
+                          }}
                           className="text-[9px] font-black text-red-400 uppercase tracking-[0.2em] flex items-center gap-1.5 hover:text-red-500 transition-colors"
                         >
                            <Trash2 size={12}/> Delete Outing
@@ -276,31 +274,6 @@ const ExpensesTab: React.FC<ExpensesTabProps> = ({ triggerAdd, sortType }) => {
           />
         )}
       </AnimatePresence>
-
-      {createPortal(
-        <AnimatePresence>
-          {activeInstanceMenu !== null && (
-            <div className="fixed inset-0 z-[200000] flex items-end">
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setActiveInstanceMenu(null)} className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
-              <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="w-full bg-white rounded-t-3xl p-6 shadow-2xl relative z-10 space-y-1">
-                 <div className="flex justify-between items-center mb-4 px-2">
-                   <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">Outing Options</h3>
-                   <button onClick={() => setActiveInstanceMenu(null)} className="p-2"><X size={20}/></button>
-                </div>
-                <MenuAction icon={<Calendar size={20}/>} label="Change Date" onClick={() => { alert('Date change coming soon'); setActiveInstanceMenu(null); }} />
-                <MenuAction icon={<Store size={20}/>} label="Change Shop" onClick={() => { alert('Shop change coming soon'); setActiveInstanceMenu(null); }} />
-                <MenuAction icon={<Trash2 size={20}/>} label="Delete Entire Trip" isDamage onClick={() => { 
-                  if(confirm('Delete this whole trip?')) {
-                    if(activeInstanceMenu) expenseInstanceDelete(activeInstanceMenu).then(fetchAll);
-                  }
-                  setActiveInstanceMenu(null); 
-                }} />
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
     </div>
   );
 };
@@ -319,7 +292,7 @@ const AddOutingOverlay: React.FC<{ onClose: () => void, onSave: () => void }> = 
   const [showShopSuggestions, setShowShopSuggestions] = useState(false);
   
   const [curItem, setCurItem] = useState<Partial<Expense>>({
-    item: '', price: undefined, category: 'Food', subcategory: 'Fresh', weight_label: WEIGHT_PRESETS[3].label, weight_kg: WEIGHT_PRESETS[3].kg, shop: '', comments: ''
+    item: '', price: undefined, quantity: 1, category: 'Food', subcategory: 'Fresh', weight_label: WEIGHT_PRESETS[3].label, weight_kg: WEIGHT_PRESETS[3].kg, shop: '', comments: ''
   });
 
   useEffect(() => {
@@ -333,7 +306,7 @@ const AddOutingOverlay: React.FC<{ onClose: () => void, onSave: () => void }> = 
     if (!curItem.item || !curItem.price) return;
     setItems([...items, { ...curItem, shop: outing.shop || 'Unknown', date: outing.date }]);
     setCurItem({
-      item: '', price: undefined, category: 'Food', subcategory: 'Fresh', weight_label: WEIGHT_PRESETS[3].label, weight_kg: WEIGHT_PRESETS[3].kg, shop: '', comments: ''
+      item: '', price: undefined, quantity: 1, category: 'Food', subcategory: 'Fresh', weight_label: WEIGHT_PRESETS[3].label, weight_kg: WEIGHT_PRESETS[3].kg, shop: '', comments: ''
     });
   };
 
@@ -413,12 +386,12 @@ const AddOutingOverlay: React.FC<{ onClose: () => void, onSave: () => void }> = 
                         <span className="text-xl">{CATEGORY_ICONS[item.category!] || '📦'}</span>
                         <div className="flex flex-col">
                            <span className="text-sm font-bold">{item.item}</span>
-                           <span className="text-[9px] font-black text-black/30 uppercase">{item.subcategory} • {item.weight_label}</span>
+                           <span className="text-[9px] font-black text-black/30 uppercase">{item.subcategory} • {item.weight_label} {item.quantity && item.quantity > 1 ? `• ${item.quantity} qty` : ''}</span>
                         </div>
                      </div>
                      <div className="flex items-center gap-3">
                         <span className="text-sm font-black">₹{item.price}</span>
-                        <button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="text-red-300"><X size={16}/></button>
+                        <button onClick={() => setItems(items.filter(( i) => i !== idx))} className="text-red-300"><X size={16}/></button>
                      </div>
                   </div>
                 ))}
@@ -426,20 +399,26 @@ const AddOutingOverlay: React.FC<{ onClose: () => void, onSave: () => void }> = 
 
              {/* Add Item Form */}
              <div className="bg-[#333333] p-5 rounded-lg shadow-xl space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                   <div className="col-span-2">
+                <div className="grid grid-cols-12 gap-3">
+                   <div className="col-span-12">
                       <input 
                         className="w-full bg-white/5 text-white p-3 rounded-sm text-sm font-bold outline-none placeholder-white/20 border border-white/10 focus:border-white/30 transition-all" 
                         placeholder="Item Name (e.g. Milk)" value={curItem.item} onChange={e => setCurItem({...curItem, item: e.target.value})}
                       />
                    </div>
-                   <div>
+                   <div className="col-span-5">
                       <input 
                         type="number" className="w-full bg-white/5 text-white p-3 rounded-sm text-sm font-bold outline-none placeholder-white/20 border border-white/10" 
                         placeholder="Price" value={curItem.price || ''} onChange={e => setCurItem({...curItem, price: Number(e.target.value)})}
                       />
                    </div>
-                   <div>
+                   <div className="col-span-3">
+                      <input 
+                        type="number" className="w-full bg-white/5 text-white p-3 rounded-sm text-sm font-bold outline-none placeholder-white/20 border border-white/10" 
+                        placeholder="Qty" value={curItem.quantity || ''} onChange={e => setCurItem({...curItem, quantity: Number(e.target.value)})}
+                      />
+                   </div>
+                   <div className="col-span-4">
                       <select className="w-full bg-white/5 text-white p-3 rounded-sm text-[11px] font-bold outline-none border border-white/10" value={curItem.category} onChange={e => setCurItem({...curItem, category: e.target.value, subcategory: CATEGORIES[e.target.value][0]})}>
                         {Object.keys(CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                       </select>

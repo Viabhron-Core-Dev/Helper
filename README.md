@@ -1,35 +1,20 @@
-# VIAN Native Android App
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
-This project has been migrated from a PWA to a full native Android application using Kotlin and Jetpack Compose.
+# Run and deploy your AI Studio app
 
-## Project Structure
+This contains everything you need to run your app locally.
 
-- `app/`: The main Android application module.
-  - `src/main/java/com/vian/app/`: Kotlin source code.
-  - `src/main/res/`: Android resources (strings, themes).
-- `.github/workflows/`: GitHub Actions configuration for CI/CD.
-- `web_reference/`: Original PWA source code for reference.
+View your app in AI Studio: https://ai.studio/apps/ffa87b9a-c98d-41c4-8fcb-f52e48526ef5
 
-## Building Locally
+## Run Locally
 
-To build the APK locally, run:
-```bash
-./gradlew assembleDebug
-```
-The output APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
+**Prerequisites:**  Node.js
 
-## GitHub Actions (CI/CD)
 
-Every time you push to the `main` or `master` branch, GitHub Actions will automatically:
-1. Set up the Android environment.
-2. Build the debug APK.
-3. Upload the APK as a workflow artifact.
-
-You can download the built APK from the **Actions** tab in your GitHub repository.
-
-## Features Implemented (Native)
-
-- **Room Database**: Local persistence for Notes, Expenses, Habits, Journal, and Events.
-- **Jetpack Compose**: Modern declarative UI for the Dashboard.
-- **Navigation**: Structured navigation between screens.
-- **Repository Pattern**: Clean architecture for data management.
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`

@@ -59,9 +59,7 @@
         "shop": { "type": "string" },
         "date": { "type": "string", "format": "date" },
         "comments": { "type": "string" },
-        "createdAt": { "type": "number" },
-        "deleted": { "type": "boolean" },
-        "deletedAt": { "type": "number" }
+        "createdAt": { "type": "number" }
       },
       "required": ["item", "category", "subcategory", "price", "weight_label", "weight_kg", "shop", "date", "createdAt"]
     },
@@ -74,9 +72,7 @@
         "date": { "type": "string", "format": "date" },
         "shop": { "type": "string" },
         "total": { "type": "number" },
-        "createdAt": { "type": "number" },
-        "deleted": { "type": "boolean" },
-        "deletedAt": { "type": "number" }
+        "createdAt": { "type": "number" }
       },
       "required": ["name", "date", "total", "createdAt"]
     },
@@ -95,9 +91,7 @@
         "subHabits": { "type": "array", "items": { "$ref": "SubHabit" } },
         "order": { "type": "number" },
         "archived": { "type": "boolean" },
-        "createdAt": { "type": "number" },
-        "deleted": { "type": "boolean" },
-        "deletedAt": { "type": "number" }
+        "createdAt": { "type": "number" }
       },
       "required": ["name", "icon", "color", "type", "frequency", "order", "archived", "createdAt"]
     },
@@ -140,9 +134,7 @@
         "modifiedAt": { "type": "number" },
         "tags": { "type": "array", "items": { "type": "string" } },
         "attachments": { "type": "array", "items": { "$ref": "Attachment" } },
-        "lastOpenedAt": { "type": "number" },
-        "deleted": { "type": "boolean" },
-        "deletedAt": { "type": "number" }
+        "lastOpenedAt": { "type": "number" }
       },
       "required": ["title", "body", "date", "emotion", "color", "createdAt", "modifiedAt", "tags"]
     },
@@ -163,9 +155,7 @@
         "reminder": { "type": "string" },
         "repeat": { "type": "string" },
         "archived": { "type": "boolean" },
-        "createdAt": { "type": "number" },
-        "deleted": { "type": "boolean" },
-        "deletedAt": { "type": "number" }
+        "createdAt": { "type": "number" }
       },
       "required": ["title", "date", "time", "repeat", "archived", "createdAt"]
     }

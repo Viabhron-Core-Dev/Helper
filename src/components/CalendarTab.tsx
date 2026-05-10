@@ -14,15 +14,16 @@ import {
   subMonths 
 } from 'date-fns';
 import { VianEvent, Habit, HabitRecord, Expense, Note, JournalEntry } from '../types';
-import { eventsGetAll, eventSave, eventDelete, habitsGetAll, habitRecordsForHabit, expenseGetAll, notesGetAll, notesDelete, journalGetAll, journalSave, journalDelete, expenseDelete } from '../lib/db';
+import { eventsGetAll, eventSave, eventDelete, habitsGetAll, habitRecordsForHabit, expenseGetAll, expenseDelete, notesGetAll, journalGetAll, journalSave, journalDelete } from '../lib/db';
 
-interface CalendarTabProps {
-  triggerAdd: number;
-}
+import { useApp } from '../AppContext';
+
+interface CalendarTabProps {}
 
 type CalendarView = 'month' | 'list' | 'actions' | 'notes' | 'journals' | 'medical';
 
-const CalendarTab: React.FC<CalendarTabProps> = ({ triggerAdd }) => {
+const CalendarTab: React.FC<CalendarTabProps> = () => {
+  const { triggerAdd } = useApp();
   const [view, setView] = useState<CalendarView>('month');
   const [showViewMenu, setShowViewMenu] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -127,8 +128,7 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ triggerAdd }) => {
   const filteredNotes = notes.filter(n => {
     const d = new Date(n.createdAt);
     const inDate = isSameDay(d, selectedDate);
-    const bodyText = n.type === 'checklist' ? n.items?.map(i => i.text).join(' ') : n.body;
-    const matchesSearch = n.title.toLowerCase().includes(searchQuery.toLowerCase()) || (bodyText || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = n.title.toLowerCase().includes(searchQuery.toLowerCase()) || (n.body || '').toLowerCase().includes(searchQuery.toLowerCase());
     return (view === 'month' ? inDate : true) && matchesSearch && (searchCategory === 'all' || searchCategory === 'notes');
   });
 
@@ -285,82 +285,72 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ triggerAdd }) => {
                     sub={event.time} 
                     accent={event.icon === '🏥' ? 'bg-red-400' : 'bg-white'}
                   />
-                  <div className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        if (confirm('Delete this event?')) {
-                          await eventDelete(event.id!);
-                          fetchData();
-                        }
-                      }}
-                      className="p-2 text-gray-300 hover:text-red-500"
-                    >
-                      <Trash2 size={16}/>
-                    </button>
-                  </div>
+                  <button 
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (confirm('Delete this event?')) {
+                        await eventDelete(event.id!);
+                        fetchData();
+                      }
+                    }}
+                    className="absolute right-12 top-1/2 -translate-y-1/2 p-2 text-red-500 shadow-sm bg-white rounded-full transition-opacity active:scale-90"
+                  >
+                    <Trash2 size={16}/>
+                  </button>
                 </div>
               ))}
               {(view === 'actions') && dayHabits.map(habit => (
-                <div key={habit.id} className="relative group">
-                  <PointCard icon={<Activity size={18}/>} title={habit.name} sub="Habit Complete" accent="bg-teal-500" />
-                </div>
+                <PointCard key={habit.id} icon={<Activity size={18}/>} title={habit.name} sub="Habit Complete" accent="bg-teal-500" />
               ))}
               {(view === 'actions') && filteredExpenses.map(exp => (
                 <div key={exp.id} className="relative group">
-                  <PointCard icon={<Wallet size={18}/>} title={exp.item} sub={`₹${exp.price}`} accent="bg-red-500" />
-                  <div className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        if (confirm('Delete this expense?')) {
-                          await expenseDelete(exp.id!);
-                          fetchData();
-                        }
-                      }}
-                      className="p-2 text-gray-300 hover:text-red-500"
-                    >
-                      <Trash2 size={16}/>
-                    </button>
-                  </div>
+                  <PointCard icon={<Wallet size={18}/>} title={exp.item || 'Expense'} sub={`₹${exp.price}`} accent="bg-red-500" />
+                  <button 
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (confirm('Delete this expense?')) {
+                        await expenseDelete(exp.id!);
+                        fetchData();
+                      }
+                    }}
+                    className="absolute right-12 top-1/2 -translate-y-1/2 p-2 text-red-500 shadow-sm bg-white rounded-full transition-opacity active:scale-90"
+                  >
+                    <Trash2 size={16}/>
+                  </button>
                 </div>
               ))}
               {(view === 'notes') && filteredNotes.map(note => (
                 <div key={note.id} className="relative group">
                   <PointCard icon={<StickyNote size={18}/>} title={note.title} sub="New Note" accent="bg-[#FBC02D]" />
-                  <div className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        if (confirm('Delete this note?')) {
-                          await notesDelete(note.id!);
-                          fetchData();
-                         }
-                      }}
-                      className="p-2 text-gray-300 hover:text-red-500"
-                    >
-                      <Trash2 size={16}/>
-                    </button>
-                  </div>
+                  <button 
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (confirm('Delete this note?')) {
+                        await notesDelete(note.id!);
+                        fetchData();
+                      }
+                    }}
+                    className="absolute right-12 top-1/2 -translate-y-1/2 p-2 text-red-500 shadow-sm bg-white rounded-full transition-opacity active:scale-90"
+                  >
+                    <Trash2 size={16}/>
+                  </button>
                 </div>
               ))}
               {(view === 'journals' || view === 'actions') && filteredJournals.map(journal => (
                 <div key={journal.id} className="relative group">
-                  <PointCard icon={<Book size={18}/>} title={journal.title} sub="Journal Entry" accent="bg-indigo-500" />
-                  <div className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        if (confirm('Delete this journal?')) {
-                          await journalDelete(journal.id!);
-                          fetchData();
-                        }
-                      }}
-                      className="p-2 text-gray-300 hover:text-red-500"
-                    >
-                      <Trash2 size={16}/>
-                    </button>
-                  </div>
+                  <PointCard icon={<Book size={18}/>} title={journal.title || 'Journal Entry'} sub="Journal Entry" accent="bg-indigo-500" />
+                  <button 
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (confirm('Delete this journal entry?')) {
+                        await journalDelete(journal.id!);
+                        fetchData();
+                      }
+                    }}
+                    className="absolute right-12 top-1/2 -translate-y-1/2 p-2 text-red-500 shadow-sm bg-white rounded-full transition-opacity active:scale-90"
+                  >
+                    <Trash2 size={16}/>
+                  </button>
                 </div>
               ))}
             </div>

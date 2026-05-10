@@ -8,15 +8,12 @@ import { NOTE_COLORS } from '../constants';
 import NoteEditor from './NoteEditor';
 import { format, formatDistanceToNow } from 'date-fns';
 
-interface NotesGridProps {
-  triggerAdd: number;
-  sortType: SortType;
-  showArchive?: boolean;
-}
+import { useApp } from '../AppContext';
 
-type SortType = 'modified' | 'created' | 'alphabetical' | 'color';
+interface NotesGridProps {}
 
-const NotesGrid: React.FC<NotesGridProps> = ({ triggerAdd, sortType, showArchive = false }) => {
+const NotesGrid: React.FC<NotesGridProps> = () => {
+  const { triggerAdd, sortType, isArchive: showArchive } = useApp();
   const [notes, setNotes] = useState<Note[]>([]);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -92,9 +89,9 @@ const NotesGrid: React.FC<NotesGridProps> = ({ triggerAdd, sortType, showArchive
     
     // Support archive view
     if (showArchive) {
-      data = data.filter(n => n.archived && !n.deleted);
+      data = data.filter(n => n.archived);
     } else {
-      data = data.filter(n => !n.archived && !n.deleted);
+      data = data.filter(n => !n.archived);
     }
     
     // Sort
@@ -137,7 +134,7 @@ const NotesGrid: React.FC<NotesGridProps> = ({ triggerAdd, sortType, showArchive
         window.history.back();
       }
       setEditingNote(null);
-      fetchNotes(); // Refresh to catch deletions or updates
+      fetchNotes();
     }
   };
 
@@ -151,11 +148,9 @@ const NotesGrid: React.FC<NotesGridProps> = ({ triggerAdd, sortType, showArchive
     if (selectedIds.size === 0) return;
     
     if (action === 'delete') {
-      if (confirm(`Delete ${selectedIds.size} notes?`)) {
-        for (const id of Array.from(selectedIds)) {
-          await notesDelete(id as number);
-        }
-      } else return;
+      for (const id of Array.from(selectedIds)) {
+        await notesDelete(id as number);
+      }
     } else if (action === 'color') {
       for (const id of Array.from(selectedIds)) {
         const note = notes.find(n => n.id === id);
@@ -174,7 +169,7 @@ const NotesGrid: React.FC<NotesGridProps> = ({ triggerAdd, sortType, showArchive
     }
 
     toggleSelectMode(false);
-    await fetchNotes();
+    fetchNotes();
   };
 
   const filteredNotes = notes;
@@ -255,20 +250,11 @@ const NotesGrid: React.FC<NotesGridProps> = ({ triggerAdd, sortType, showArchive
                     </h3>
                   </div>
                   
-                  <div className="shrink-0 flex items-center gap-2">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveNoteMenu(note);
-                      }}
-                      className="p-2 text-black/20 hover:text-black/40 transition-colors"
-                    >
-                      <MoreHorizontal size={22} />
-                    </button>
+                  <div className="shrink-0 flex items-center gap-3">
                     {note.type === 'checklist' && (
                        <Check size={20} className="text-black/60" strokeWidth={3} />
                     )}
-                    <span className="text-[1rem] text-black/60 font-medium whitespace-nowrap">
+                    <span className="text-[1rem] text-black/60 font-medium">
                       {format(note.modifiedAt, 'dd MMM')}
                     </span>
                   </div>
@@ -405,30 +391,6 @@ const NotesGrid: React.FC<NotesGridProps> = ({ triggerAdd, sortType, showArchive
           />
         )}
       </AnimatePresence>
-
-      {createPortal(
-        <AnimatePresence>
-          {activeNoteMenu && (
-            <div className="fixed inset-0 z-[200000] flex items-end">
-               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setActiveNoteMenu(null)} className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
-               <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="w-full bg-white rounded-t-3xl p-6 shadow-2xl relative z-10 space-y-1">
-                  <div className="flex justify-between items-center mb-4 px-2">
-                     <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">Note Options</h3>
-                     <button onClick={() => setActiveNoteMenu(null)} className="p-2"><X size={20}/></button>
-                  </div>
-                  <MenuAction icon={<Trash2 size={20}/>} label="Send to Trash" isDamage onClick={async () => { if(confirm('Delete note?')) { await notesDelete(activeNoteMenu.id!); await fetchNotes(); } setActiveNoteMenu(null); }} />
-                  <MenuAction icon={<Palette size={20}/>} label="Change Color" onClick={() => { setActiveNoteMenu(null); openEditor(activeNoteMenu); }} />
-                  <MenuAction icon={<Archive size={20}/>} label={showArchive ? "Restore" : "Archive"} onClick={async () => { 
-                    await notesSave({ ...activeNoteMenu, archived: !showArchive, modifiedAt: Date.now() });
-                    fetchNotes();
-                    setActiveNoteMenu(null); 
-                  }} />
-               </motion.div>
-            </div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
     </div>
   );
 };

@@ -8,7 +8,6 @@ import {
 import { createPortal } from 'react-dom';
 import { Note, ChecklistItem } from '../types';
 import { format, formatDistanceToNow } from 'date-fns';
-import { notesDelete } from '../lib/db';
 
 const COLOR_PALETTE = [
   { name: 'red', bg: '#FF8A80', border: '#D32F2F' },
@@ -54,6 +53,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onClose }) => {
   const [historyIndex, setHistoryIndex] = useState(0);
 
   const titleRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const dialogInputRef = useRef<HTMLTextAreaElement>(null);
 
   const savedRef = useRef(false);
@@ -80,6 +80,12 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onClose }) => {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [isEditing, onSave, onClose]);
+
+  useEffect(() => {
+    if (isEditing && editedNote.type === 'text') {
+      setTimeout(() => bodyRef.current?.focus(), 50);
+    }
+  }, [isEditing]);
 
   const colorObj = COLOR_PALETTE.find(c => c.name === editedNote.color) || COLOR_PALETTE[2];
 
@@ -165,6 +171,29 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onClose }) => {
     handleStateChange({ ...editedNote, items: newItems, modifiedAt: Date.now() });
   };
 
+  const handleDoubleClick = (e: React.MouseEvent | React.TouchEvent) => {
+    const selection = window.getSelection();
+    let offset = 0;
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const preCaretRange = range.cloneRange();
+      const currentTarget = e.currentTarget as Node;
+      preCaretRange.selectNodeContents(currentTarget);
+      preCaretRange.setEnd(range.endContainer, range.endOffset);
+      offset = preCaretRange.toString().length;
+    }
+
+    setIsEditing(true);
+    setTimeout(() => {
+      if (bodyRef.current) {
+        bodyRef.current.focus();
+        if (offset > 0) {
+          bodyRef.current.setSelectionRange(offset, offset);
+        }
+      }
+    }, 50);
+  };
+
   const editorContent = (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -203,14 +232,15 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onClose }) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto" style={{ 
+      <div className="flex-1 overflow-y-auto" style={editedNote.type === 'text' ? { 
           backgroundImage: `repeating-linear-gradient(transparent, transparent 47px, ${colorObj.border}33 47px, ${colorObj.border}33 48px)`,
           backgroundSize: '100% 48px'
-      }}>
+      } : {}}>
         {editedNote.type === 'text' ? (
           <div className="px-4 py-2 min-h-full flex flex-col">
             {isEditing ? (
               <textarea
+                ref={bodyRef}
                 className="w-full bg-transparent border-none outline-none resize-none text-2xl font-medium leading-[48px] flex-1 text-black placeholder-black/20"
                 value={editedNote.body}
                 onChange={e => handleStateChange({ ...editedNote, body: e.target.value })}
@@ -219,7 +249,10 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onClose }) => {
             ) : (
               <div 
                 className="text-2xl font-medium leading-[48px] whitespace-pre-wrap text-black flex-1"
-                onClick={() => setIsEditing(true)}
+                onDoubleClick={handleDoubleClick}
+                onClick={(e) => {
+                  if (e.detail === 2) handleDoubleClick(e);
+                }}
               >
                 {editedNote.body || <span className="text-black/10 italic">No content</span>}
               </div>
@@ -369,13 +402,12 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onSave, onClose }) => {
                 icon={<Trash2 size={18}/>} 
                 isDamage
                 onClick={async () => {
-                  if (confirm('Move to trash?')) {
-                    shouldDiscardRef.current = true;
-                    if (editedNote.id) {
-                      await notesDelete(editedNote.id);
-                    }
-                    onClose();
+                  shouldDiscardRef.current = true;
+                  if (editedNote.id) {
+                    const { notesDelete } = await import('../lib/db');
+                    await notesDelete(editedNote.id);
                   }
+                  onClose();
                 }} 
               />
               <MenuItem 

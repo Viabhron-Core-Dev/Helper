@@ -103,7 +103,8 @@ export async function dbDelete(store: string, id: number) {
 
 // Notes CRUD
 export async function notesGetAll() {
-  return (await dbGetAll('notes')) as Note[];
+  const all = (await dbGetAll('notes')) as Note[];
+  return all.filter(n => !n.deleted) as Note[];
 }
 
 export async function notesGetArchived() {
@@ -112,7 +113,7 @@ export async function notesGetArchived() {
 }
 
 export async function notesGetTrashed() {
-  const all = await notesGetAll();
+  const all = (await dbGetAll('notes')) as Note[];
   return all.filter(n => n.deleted) as Note[];
 }
 
@@ -138,13 +139,14 @@ export async function notesDelete(id: number) {
 
 // Expenses CRUD
 export async function expenseGetAll() {
-  return (await dbGetAll('expenses')) as Expense[];
+  const all = (await dbGetAll('expenses')) as Expense[];
+  return all.filter(e => !e.deleted) as Expense[];
 }
 
 export async function expensesForInstance(instanceId: number) {
   const db = await getDB();
-  const all = (await db.getAllFromIndex('expenses', 'instanceId', instanceId)) as Expense[];
-  return all.filter(e => !e.deleted);
+  const items = (await db.getAllFromIndex('expenses', 'instanceId', instanceId)) as Expense[];
+  return items.filter(e => !e.deleted) as Expense[];
 }
 
 export async function expenseSave(e: Expense) {
@@ -158,12 +160,23 @@ export async function expenseDelete(id: number) {
   if (!e) return;
   e.deleted = true;
   e.deletedAt = Date.now();
-  return dbPut('expenses', e);
+  await dbPut('expenses', e);
+  
+  // Update instance total
+  if (e.instanceId) {
+    const instance = await dbGet('expense_instances', e.instanceId);
+    if (instance) {
+      const items = await expensesForInstance(e.instanceId);
+      instance.total = items.reduce((sum, item) => sum + item.price, 0);
+      await dbPut('expense_instances', instance);
+    }
+  }
 }
 
 // Expense Instance CRUD
 export async function expenseInstanceGetAll() {
-  return (await dbGetAll('expense_instances')) as ExpenseInstance[];
+  const all = (await dbGetAll('expense_instances')) as ExpenseInstance[];
+  return all.filter(i => !i.deleted) as ExpenseInstance[];
 }
 
 export async function expenseInstanceSave(ei: ExpenseInstance) {
@@ -194,7 +207,8 @@ export async function expenseInstanceDelete(id: number) {
 
 // Habits CRUD
 export async function habitsGetAll() {
-  return (await dbGetAll('habits')) as Habit[];
+  const all = (await dbGetAll('habits')) as Habit[];
+  return all.filter(h => !h.deleted) as Habit[];
 }
 
 export async function habitSave(h: Habit) {
@@ -237,7 +251,8 @@ export async function habitRecordsForHabit(habitId: number) {
 
 // Journal CRUD
 export async function journalGetAll() {
-  return (await dbGetAll('journal')) as JournalEntry[];
+  const all = (await dbGetAll('journal')) as JournalEntry[];
+  return all.filter(j => !j.deleted) as JournalEntry[];
 }
 
 export async function journalSave(entry: JournalEntry) {
@@ -257,7 +272,8 @@ export async function journalDelete(id: number) {
 
 // Events CRUD
 export async function eventsGetAll() {
-  return (await dbGetAll('events')) as VianEvent[];
+  const all = (await dbGetAll('events')) as VianEvent[];
+  return all.filter(e => !e.deleted) as VianEvent[];
 }
 
 export async function eventSave(ev: VianEvent) {
@@ -277,22 +293,19 @@ export async function eventDelete(id: number) {
 // Global Trash
 export async function trashGetAll() {
   const notes = await dbGetAll('notes');
-  const expenseInstances = await dbGetAll('expense_instances');
-  const expenses = await dbGetAll('expenses');
+  const expenses = await dbGetAll('expense_instances');
   const habits = await dbGetAll('habits');
   const events = await dbGetAll('events');
   const journals = await dbGetAll('journal');
 
   const trashedNotes = notes.filter(n => n.deleted).map(n => ({ ...n, trashType: 'note', trashId: `note-${n.id}` }));
-  const trashedInstances = expenseInstances.filter(e => e.deleted).map(e => ({ ...e, trashType: 'outing', trashId: `outing-${e.id}` }));
-  const trashedExpenses = expenses.filter(e => e.deleted && (!e.instanceId || !expenseInstances.find(i => i.id === e.instanceId)?.deleted)).map(e => ({ ...e, trashType: 'expense', trashId: `expense-${e.id}` }));
+  const trashedExpenses = expenses.filter(e => e.deleted).map(e => ({ ...e, trashType: 'expense', trashId: `expense-${e.id}` }));
   const trashedHabits = habits.filter(h => h.deleted).map(h => ({ ...h, trashType: 'habit', trashId: `habit-${h.id}` }));
   const trashedEvents = events.filter(ev => ev.deleted).map(ev => ({ ...ev, trashType: 'event', trashId: `event-${ev.id}` }));
   const trashedJournals = journals.filter(j => j.deleted).map(j => ({ ...j, trashType: 'journal', trashId: `journal-${j.id}` }));
 
   return [
     ...trashedNotes,
-    ...trashedInstances,
     ...trashedExpenses,
     ...trashedHabits,
     ...trashedEvents,
@@ -303,12 +316,7 @@ export async function trashGetAll() {
 export async function trashRestore(trashId: string) {
   const [type, idStr] = trashId.split('-');
   const id = parseInt(idStr);
-  const store = type === 'note' ? 'notes' 
-              : type === 'outing' ? 'expense_instances' 
-              : type === 'expense' ? 'expenses' 
-              : type === 'habit' ? 'habits' 
-              : type === 'journal' ? 'journal' 
-              : 'events';
+  const store = type === 'note' ? 'notes' : type === 'expense' ? 'expense_instances' : type === 'habit' ? 'habits' : type === 'journal' ? 'journal' : 'events';
   
   const item = await dbGet(store, id);
   if (item) {
@@ -316,13 +324,11 @@ export async function trashRestore(trashId: string) {
     delete item.deletedAt;
     await dbPut(store, item);
     
-    // If it's an expense instance (outing), also restore its items that were deleted WITH it
-    if (type === 'outing') {
+    // If it's an expense instance, also restore its items
+    if (type === 'expense') {
       const db = await getDB();
       const items = await db.getAllFromIndex('expenses', 'instanceId', id);
       for (const e of items) {
-        // Only restore items that don't have a newer independent deletedAt? 
-        // Or just restore all if they were part of this instance.
         e.deleted = false;
         delete e.deletedAt;
         await dbPut('expenses', e);
@@ -334,14 +340,9 @@ export async function trashRestore(trashId: string) {
 export async function trashPermanentDelete(trashId: string) {
   const [type, idStr] = trashId.split('-');
   const id = parseInt(idStr);
-  const store = type === 'note' ? 'notes' 
-              : type === 'outing' ? 'expense_instances' 
-              : type === 'expense' ? 'expenses' 
-              : type === 'habit' ? 'habits' 
-              : type === 'journal' ? 'journal' 
-              : 'events';
+  const store = type === 'note' ? 'notes' : type === 'expense' ? 'expense_instances' : type === 'habit' ? 'habits' : type === 'journal' ? 'journal' : 'events';
   
-  if (type === 'outing') {
+  if (type === 'expense') {
     const db = await getDB();
     const items = await db.getAllFromIndex('expenses', 'instanceId', id);
     for (const e of items) {

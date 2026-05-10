@@ -1,4 +1,6 @@
 export type NoteType = 'text' | 'checklist';
+export type Tab = 'notes' | 'expenses' | 'habits' | 'calendar';
+export type SortType = 'modified' | 'created' | 'alphabetical' | 'color';
 
 export interface Note {
   id?: number;
@@ -38,6 +40,7 @@ export interface Expense {
   category: string;
   subcategory: string;
   price: number;
+  quantity?: number;
   weight_label: string;
   weight_kg: number;
   shop: string;

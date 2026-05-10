@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Check, ArrowLeft, MoreVertical, ListFilter, X, ChevronRight, ChevronDown, Trash2, Pencil, Calendar as CalendarIcon, Bell, BellOff } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Habit, HabitRecord, SubHabit } from '../types';
-import { habitsGetAll, habitSave, habitRecordSet, habitRecordsForHabit, habitDelete } from '../lib/db';
+import { habitsGetAll, habitSave, habitRecordSet, habitRecordsForHabit } from '../lib/db';
 import { COMMON_ICONS } from '../constants';
 
-interface HabitsTabProps {
-  triggerAdd: number;
-  sortType: 'modified' | 'created' | 'alphabetical' | 'order';
-}
+import { useApp } from '../AppContext';
 
-const HabitsTab: React.FC<HabitsTabProps> = ({ triggerAdd, sortType }) => {
+interface HabitsTabProps {}
+
+const HabitsTab: React.FC<HabitsTabProps> = () => {
+  const { triggerAdd, sortType } = useApp();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [records, setRecords] = useState<Record<string, HabitRecord>>({});
   const [showAdd, setShowAdd] = useState(false);
@@ -71,7 +71,7 @@ const HabitsTab: React.FC<HabitsTabProps> = ({ triggerAdd, sortType }) => {
 
   const fetchHabits = async () => {
     const data = await habitsGetAll();
-    let sorted = data.filter(h => !h.archived && !h.deleted);
+    let sorted = data.filter(h => !h.archived);
     
     if (sortType === 'alphabetical') {
       sorted.sort((a, b) => a.name.localeCompare(b.name));
@@ -109,8 +109,12 @@ const HabitsTab: React.FC<HabitsTabProps> = ({ triggerAdd, sortType }) => {
   };
 
   const handleLongPress = (id: number) => {
-    toggleSelectMode(true);
-    setSelectedIds(new Set([id]));
+    if (isSelectMode) {
+      toggleSelection(id);
+    } else {
+      toggleSelectMode(true);
+      setSelectedIds(new Set([id]));
+    }
   };
 
   const handleCellTap = async (habitId: number, dateStr: string, isMeasurable: boolean) => {
@@ -167,29 +171,54 @@ const HabitsTab: React.FC<HabitsTabProps> = ({ triggerAdd, sortType }) => {
         <AnimatePresence>
           {isSelectMode && (
             <motion.div 
-              initial={{ y: -50 }}
+              initial={{ y: -60 }}
               animate={{ y: 0 }}
-              exit={{ y: -50 }}
-              className="fixed top-0 left-0 right-0 h-16 bg-white shadow-md z-[99999] flex items-center px-4 gap-4"
+              exit={{ y: -60 }}
+              className="fixed top-0 left-0 right-0 h-16 bg-[#CCCCCC] shadow-md z-[99999] flex items-center px-4 gap-4 border-b border-black/10"
             >
-              <button onClick={() => toggleSelectMode(false)} className="p-2">
-                <X size={24} className="text-black" />
+              <button onClick={() => toggleSelectMode(false)} className="p-3 active:bg-black/10">
+                <X size={32} className="text-[#333333]" strokeWidth={3} />
               </button>
-              <span className="font-bold text-lg flex-1 text-black">{selectedIds.size} selected</span>
+              <span className="font-black text-2xl flex-1 text-[#333333] ml-2">
+                 {selectedIds.size}/{habits.length}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* Selection Bottom Bar */}
+      {createPortal(
+        <AnimatePresence>
+          {isSelectMode && (
+            <motion.div 
+              initial={{ y: 100 }}
+              animate={{ y: 0 }}
+              exit={{ y: 100 }}
+              className="fixed bottom-0 left-0 right-0 h-20 bg-[#EEEEEE] border-t border-black/10 z-[99999] flex items-center justify-around px-2"
+            >
               <button 
                 onClick={async () => {
-                  if (confirm(`Delete ${selectedIds.size} habits?`)) {
-                    for (const id of Array.from(selectedIds)) {
-                      await habitDelete(id as number);
-                    }
-                    setSelectedIds(new Set());
-                    toggleSelectMode(false);
-                    await fetchHabits();
+                  const { habitDelete } = await import('../lib/db');
+                  for (const id of selectedIds) {
+                    await habitDelete(id);
                   }
-                }} 
-                className="p-2 text-red-500"
+                  toggleSelectMode(false);
+                  fetchHabits();
+                }}
+                className="flex flex-col items-center justify-center h-full flex-1 active:bg-black/5 gap-0.5"
               >
-                <Trash2 size={24} />
+                <Trash2 size={28} className="text-[#333333]" strokeWidth={2.5} />
+                <span className="text-[13px] font-black uppercase text-[#333333]">Delete</span>
+              </button>
+              <button onClick={() => {}} className="flex flex-col items-center justify-center h-full flex-1 active:bg-black/5 gap-0.5 opacity-30">
+                <Bell size={28} className="text-[#333333]" strokeWidth={2.5} />
+                <span className="text-[13px] font-black uppercase text-[#333333]">Alerts</span>
+              </button>
+              <button onClick={() => {}} className="flex flex-col items-center justify-center h-full flex-1 active:bg-black/5 gap-0.5 opacity-30">
+                <MoreVertical size={28} className="text-[#333333]" strokeWidth={2.5} />
+                <span className="text-[13px] font-black uppercase text-[#333333]">More</span>
               </button>
             </motion.div>
           )}
@@ -216,89 +245,88 @@ const HabitsTab: React.FC<HabitsTabProps> = ({ triggerAdd, sortType }) => {
              const isExpanded = expandedHabits[habit.id!] || false;
              const isSelected = selectedIds.has(habit.id!);
              
-             return (
-               <div 
-                 key={habit.id} 
-                 className={`flex flex-col transition-colors ${isSelected ? 'bg-yellow-50' : ''}`}
-                 onContextMenu={(e) => { e.preventDefault(); habit.id && handleLongPress(habit.id); }}
-               >
-                  <div className="flex items-center min-h-[64px]">
-                    <div 
-                      className="flex-1 flex items-center gap-4 px-4 py-3 cursor-pointer"
-                      onClick={() => {
-                        if (isSelectMode) toggleSelection(habit.id!);
-                        else if (habit.type === 'combination') toggleExpand(habit.id!);
-                        else openDetail(habit);
-                      }}
-                    >
-                       <ProgressRing progress={todayProg} size={36} icon={habit.icon} />
-                       <div className="flex-1 min-w-0 flex items-center gap-2">
-                          <h3 className={`font-black text-black text-base truncate leading-tight uppercase tracking-tight ${todayProg >= 100 ? 'text-black/30' : ''}`}>
-                            {habit.name}
-                          </h3>
-                          {habit.type === 'combination' && (
-                            isExpanded ? <ChevronDown size={14} className="text-black/20" /> : <ChevronRight size={14} className="text-black/20" />
-                          )}
-                       </div>
+              return (
+                <LongPressItem 
+                  key={habit.id} 
+                  onLongPress={() => habit.id && handleLongPress(habit.id)}
+                  onClick={() => {
+                    if (isSelectMode) toggleSelection(habit.id!);
+                    else if (habit.type === 'combination') toggleExpand(habit.id!);
+                    else openDetail(habit);
+                  }}
+                >
+                  <div className={`flex flex-col transition-colors ${isSelected ? 'bg-yellow-50' : ''}`}>
+                    <div className="flex items-center min-h-[64px]">
+                      <div className="flex-1 flex items-center gap-4 px-4 py-3">
+                         <ProgressRing progress={todayProg} size={36} icon={habit.icon} />
+                         <div className="flex-1 min-w-0 flex items-center gap-2">
+                            <h3 className={`font-black text-black text-base truncate leading-tight uppercase tracking-tight ${todayProg >= 100 ? 'text-black/30' : ''}`}>
+                              {habit.name}
+                            </h3>
+                            {habit.type === 'combination' && (
+                              isExpanded ? <ChevronDown size={14} className="text-black/20" /> : <ChevronRight size={14} className="text-black/20" />
+                            )}
+                         </div>
+                      </div>
+
+                      <div className="flex items-center px-4">
+                         {weekDays.map(date => {
+                           const dateStr = format(date, 'yyyy-MM-dd');
+                           const prog = calculateProgress(habit, dateStr);
+                           const val = records[`${habit.id}-${dateStr}`]?.value || 0;
+                           
+                           return (
+                             <div key={dateStr} className="w-14 flex items-center justify-center">
+                                {habit.type === 'combination' ? (
+                                  <div className="w-10 h-10 flex items-center justify-center">
+                                    <div className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center">
+                                      <div className="w-4 h-4 rounded-full bg-teal-500 transition-all" style={{ opacity: prog/100, transform: `scale(${prog/100})` }} />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <HabitCell 
+                                    type={habit.type}
+                                    value={val}
+                                    isDone={prog >= 100}
+                                    onClick={() => habit.id && handleCellTap(habit.id, dateStr, habit.type === 'measurable')}
+                                  />
+                                )}
+                             </div>
+                           );
+                         })}
+                      </div>
                     </div>
 
-                    <div className="flex items-center px-4">
-                       {weekDays.map(date => {
-                         const dateStr = format(date, 'yyyy-MM-dd');
-                         const prog = calculateProgress(habit, dateStr);
-                         const val = records[`${habit.id}-${dateStr}`]?.value || 0;
-                         
-                         return (
-                           <div key={dateStr} className="w-14 flex items-center justify-center">
-                              {habit.type === 'combination' ? (
-                                <div className="w-10 h-10 flex items-center justify-center">
-                                  <div className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center">
-                                    <div className="w-4 h-4 rounded-full bg-teal-500 transition-all" style={{ opacity: prog/100, transform: `scale(${prog/100})` }} />
-                                  </div>
-                                </div>
-                              ) : (
-                                <HabitCell 
-                                  type={habit.type}
-                                  value={val}
-                                  isDone={prog >= 100}
-                                  onClick={() => habit.id && handleCellTap(habit.id, dateStr, habit.type === 'measurable')}
-                                />
-                              )}
-                           </div>
-                         );
-                       })}
-                    </div>
-                  </div>
-
-                  {habit.type === 'combination' && isExpanded && (
-                    <div className="bg-gray-50/50 pl-14 pr-4 py-2 space-y-1">
-                      {habit.subHabits?.map((sub, sIdx) => {
-                        return (
-                          <div key={sIdx} className="flex items-center justify-between py-1">
-                            <span className="text-[11px] font-bold text-black/50 uppercase truncate max-w-[120px]">{sub.name}</span>
-                            <div className="flex items-center">
-                              {weekDays.map(date => {
-                                const dStr = format(date, 'yyyy-MM-dd');
-                                const isDone = records[`${habit.id}-sub-${sIdx}-${dStr}`]?.value > 0;
-                                return (
-                                  <div key={dStr} className="w-14 flex justify-center">
-                                    <button 
-                                      onClick={() => habit.id && handleSubHabitTap(habit.id, sIdx, dStr)}
-                                      className={`w-7 h-7 rounded-sm flex items-center justify-center border-2 transition-all ${isDone ? 'bg-black border-black text-white' : 'bg-white border-black/5 text-transparent'}`}
-                                    >
-                                      <Check size={16} strokeWidth={4} />
-                                    </button>
-                                  </div>
-                                );
-                              })}
+                    {habit.type === 'combination' && isExpanded && (
+                      <div className="bg-gray-50/50 pl-14 pr-4 py-2 space-y-1">
+                        {habit.subHabits?.map((sub, sIdx) => {
+                          return (
+                            <div key={sIdx} className="flex items-center justify-between py-1">
+                              <span className="text-[11px] font-bold text-black/50 uppercase truncate max-w-[120px]">{sub.name}</span>
+                              <div className="flex items-center">
+                                {weekDays.map(date => {
+                                  const dStr = format(date, 'yyyy-MM-dd');
+                                  const isDone = records[`${habit.id}-sub-${sIdx}-${dStr}`]?.value > 0;
+                                  return (
+                                    <div key={dStr} className="w-14 flex justify-center">
+                                      <button 
+                                        onClick={() => habit.id && handleSubHabitTap(habit.id, sIdx, dStr)}
+                                        className={`w-7 h-7 rounded-sm flex items-center justify-center border-2 transition-all ${isDone ? 'bg-black border-black text-white' : 'bg-white border-black/5 text-transparent'}`}
+                                      >
+                                        <Check size={16} strokeWidth={4} />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-               </div>
-             );
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </LongPressItem>
+              );
            })}
         </div>
       </div>
@@ -400,10 +428,9 @@ const HabitDetailOverlay: React.FC<{ habit: Habit, records: Record<string, Habit
              <button onClick={onEdit} className="p-2 rounded-full hover:bg-white/10"><Pencil size={20}/></button>
              <button 
                onClick={async () => {
-                 if (confirm('Move this habit to trash?')) {
-                   if (habit.id) await habitDelete(habit.id);
-                   onClose();
-                 }
+                 const { habitDelete } = await import('../lib/db');
+                 if (habit.id) await habitDelete(habit.id);
+                 onClose();
                }} 
                className="p-2 rounded-full hover:bg-white/10 text-red-300"
              >
@@ -460,7 +487,7 @@ const HabitDetailOverlay: React.FC<{ habit: Habit, records: Record<string, Habit
                             tick={{fontSize: 9, fontWeight: 900, fill: '#9CA3AF'}} 
                             axisLine={false} 
                             tickLine={false}
-                            tickFormatter={(v) => `${v}%`}
+                            formatContent={(v) => `${v}%`}
                          />
                          <Tooltip 
                             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 900, fontSize: '10px' }}
@@ -638,6 +665,83 @@ const HabitForm: React.FC<{ initialHabit?: Habit, onClose: () => void, onSave: (
       </div>
     </motion.div>,
     document.body
+  );
+};
+
+// Helper for long press detection
+const LongPressItem: React.FC<{ children: React.ReactNode, onLongPress: () => void, onClick: () => void }> = ({ children, onLongPress, onClick }) => {
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressActive = useRef(false);
+  const startPos = useRef({ x: 0, y: 0 });
+  const isMoved = useRef(false);
+
+  const start = (e: React.MouseEvent | React.TouchEvent) => {
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    
+    startPos.current = { x: clientX, y: clientY };
+    isMoved.current = false;
+    isLongPressActive.current = false;
+
+    timerRef.current = setTimeout(() => {
+      if (!isMoved.current) {
+        onLongPress();
+        isLongPressActive.current = true;
+      }
+    }, 500);
+  };
+
+  const stop = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+  };
+
+  const handleMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (isMoved.current) return;
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+
+    const dist = Math.sqrt(
+      Math.pow(clientX - startPos.current.x, 2) + 
+      Math.pow(clientY - startPos.current.y, 2)
+    );
+
+    if (dist > 10) {
+      isMoved.current = true;
+      if (timerRef.current) clearTimeout(timerRef.current);
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isLongPressActive.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      isLongPressActive.current = false;
+      return;
+    }
+    onClick();
+  };
+
+  return (
+    <div 
+      onMouseDown={start}
+      onMouseUp={stop}
+      onMouseMove={handleMove}
+      onTouchStart={start}
+      onTouchEnd={stop}
+      onTouchMove={handleMove}
+      onContextMenu={(e) => {
+        if (isLongPressActive.current || timerRef.current) {
+          e.preventDefault();
+        }
+      }}
+      onClick={handleClick}
+      className="select-none touch-none touch-pan-y"
+    >
+      {children}
+    </div>
   );
 };
 
